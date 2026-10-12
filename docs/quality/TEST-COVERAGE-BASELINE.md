@@ -56,3 +56,16 @@ Source: Vitest V8 table in the exact-SHA job log. This **does not represent the 
 - Threat-model security review, dependency vulnerabilities and mutation testing.
 
 A passing test job establishes only the contract it exercises. A production-ready or 100% whole-repo verdict **cannot** be justified by these first results.
+
+## Follow-up measurements from SHA `f06259a1c8724b4197f9199f6766d10864f3f89b`
+
+The [GitHub Actions run 38268653218](https://github.com/Rwanbt/artcraft/actions/runs/38268653218)
+completed with 6/7 jobs green. The complete frontend Vitest workspace job failed **before test collection**:
+duplicate project name `artcraft` from the app's Vite and Vitest configurations.
+This is a CI discovery/configuration defect, not evidence that frontend behavioral tests passed
+or failed. The next commit removes the overlapping workspace configuration selection.
+
+The LLVM summary for `web_base64` and `url_utils` on this SHA was:
+**89.83% lines, 96.55% functions, 92.55% regions**. Branch coverage was not
+reported (zero tracked branches); do not infer it from the region metric.
+The broader Rust workspace remains uninstrumented.

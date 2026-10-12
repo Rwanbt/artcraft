@@ -30,9 +30,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Run isolated core-library regression tests
-        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes
+        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes -p filesys -p jwt_light
       - name: Collect discovered core tests
-        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes -- --list
+        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes -p filesys -p jwt_light -- --list
 
   rust-coverage:
     name: Rust core coverage (Linux)

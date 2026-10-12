@@ -70,3 +70,40 @@ impl DownloadExtension {
     }
   }
 }
+
+#[cfg(test)]
+#[allow(deprecated)]
+mod contract_tests {
+  use super::DownloadExtension;
+
+  #[test]
+  fn all_supported_extensions_have_stable_filename_representations() {
+    for (extension, bare, dotted) in [
+      (DownloadExtension::Jpg, "jpg", ".jpg"),
+      (DownloadExtension::Png, "png", ".png"),
+      (DownloadExtension::Mp4, "mp4", ".mp4"),
+      (DownloadExtension::Webm, "webm", ".webm"),
+      (DownloadExtension::Mp3, "mp3", ".mp3"),
+      (DownloadExtension::Wav, "wav", ".wav"),
+      (DownloadExtension::Json, "json", ".json"),
+      (DownloadExtension::Txt, "txt", ".txt"),
+    ] {
+      assert_eq!(extension.as_extension_without_period(), bare);
+      assert_eq!(extension.as_extension_with_period(), dotted);
+      assert_eq!(DownloadExtension::try_from_str(bare), Some(extension));
+      assert_eq!(DownloadExtension::try_from_str(&bare.to_uppercase()), Some(extension));
+    }
+  }
+
+  #[test]
+  fn jpeg_alias_maps_to_the_canonical_jpg_extension() {
+    assert_eq!(DownloadExtension::try_from_str("JPEG"), Some(DownloadExtension::Jpg));
+  }
+
+  #[test]
+  fn rejects_unknown_or_malformed_file_extensions() {
+    for invalid in ["", ".png", "tar.gz", "../png", "html", "exe", "png?query"] {
+      assert_eq!(DownloadExtension::try_from_str(invalid), None);
+    }
+  }
+}

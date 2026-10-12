@@ -107,3 +107,40 @@ mod tests {
     assert_eq!(claims.expiration, DateTime::from_timestamp(1745800472, 0).unwrap());
   }
 }
+
+#[cfg(test)]
+mod invalid_claims_tests {
+  use super::CommonClaims;
+
+  #[test]
+  fn rejects_absent_or_non_numeric_expiration_and_issued_at() {
+    for claims in [
+      "{}",
+      r#"{"iat": 123}"#,
+      r#"{"exp": 456}"#,
+      r#"{"iat": "123", "exp": 456}"#,
+      r#"{"iat": 123, "exp": null}"#,
+      r#"{"iat": 123, "exp": true}"#,
+    ] {
+      assert!(CommonClaims::from_json(claims).is_err(), "accepted {claims}");
+    }
+  }
+
+  #[test]
+  fn rejects_corrupted_json_and_out_of_range_timestamp() {
+    for claims in [
+      "{bad-json}",
+      r#"{"iat": 9223372036854775807, "exp": 0}"#,
+      r#"{"iat": 0, "exp": 9223372036854775807}"#,
+    ] {
+      assert!(CommonClaims::from_json(claims).is_err(), "accepted {claims}");
+    }
+  }
+
+  #[test]
+  fn accepts_integer_timestamps_at_unix_epoch() {
+    let claims = CommonClaims::from_json(r#"{"iat": 0, "exp": 3600}"#).unwrap();
+    assert_eq!(claims.created.timestamp(), 0);
+    assert_eq!(claims.expiration.timestamp(), 3600);
+  }
+}

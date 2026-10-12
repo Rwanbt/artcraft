@@ -1,0 +1,99 @@
+name: Fork quality baseline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - 'test/**'
+      - 'fix/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-core:
+    name: Rust core tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      SQLX_OFFLINE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run isolated core-library regression tests
+        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes
+      - name: Collect discovered core tests
+        run: cargo test --locked -p web_base64 -p url_utils -p mimetypes -- --list
+
+  rust-coverage:
+    name: Rust core coverage (Linux)
+    runs-on: ubuntu-latest
+    env:
+      SQLX_OFFLINE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Instrument core Rust libraries
+        run: cargo llvm-cov --locked -p web_base64 -p url_utils --lcov --output-path coverage-rust.lcov
+      - name: Upload measured Rust coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-core-coverage
+          path: coverage-rust.lcov
+          if-no-files-found: warn
+
+  frontend-unit:
+    name: Frontend deterministic unit tests (Linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run moodboard interaction and persistence tests with V8 coverage
+        run: npx vitest run --config libs/components/moodboard/vite.config.ts --coverage
+      - name: Upload measured frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-moodboard-coverage
+          path: frontend/libs/components/moodboard/test-output/vitest/coverage
+          if-no-files-found: warn
+
+  frontend-launcher:
+    name: Frontend/Tauri launcher integration (Linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Exercise real Vite socket and fake Rust process tree
+        run: node --test scripts/unix-dev.test.mjs

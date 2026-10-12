@@ -103,6 +103,32 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+  frontend-build:
+    name: Frontend production bundle smoke (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      NX_DAEMON: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Bundle the desktop frontend without publishing
+        run: npx nx run artcraft:build --skip-nx-cache
+      - name: Verify production entrypoint exists and is nonempty
+        run: |
+          test -s apps/artcraft/dist/index.html
+          test -d apps/artcraft/dist/assets
+
   frontend-launcher:
     name: Frontend/Tauri launcher integration (Linux)
     runs-on: ubuntu-latest

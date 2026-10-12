@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: fork-quality-${{ github.workflow }}-${{ github.ref }}
+  group: fork-quality-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -47,6 +47,8 @@ jobs:
       - uses: taiki-e/install-action@cargo-llvm-cov
       - name: Instrument core Rust libraries
         run: cargo llvm-cov --locked -p web_base64 -p url_utils --lcov --output-path coverage-rust.lcov
+      - name: Print measured LLVM coverage
+        run: cargo llvm-cov report --summary-only
       - name: Upload measured Rust coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -79,6 +81,27 @@ jobs:
           name: frontend-moodboard-coverage
           path: frontend/libs/components/moodboard/test-output/vitest/coverage
           if-no-files-found: warn
+
+  frontend-workspace:
+    name: Frontend workspace test discovery and execution (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Exercise all configured Vitest workspaces
+        run: npx vitest run --workspace vitest.workspace.ts --maxWorkers=2
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
   frontend-launcher:
     name: Frontend/Tauri launcher integration (Linux)

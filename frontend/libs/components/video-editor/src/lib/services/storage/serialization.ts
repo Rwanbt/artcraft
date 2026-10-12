@@ -48,19 +48,16 @@ export function deserializeProjectDocument(
   if (!data || typeof data !== "object") return null;
 
   if ("metadata" in data) {
-    return {
-      project: reviveProject(data as SerializedProject),
-      media: [],
-    };
+    const project = reviveProject(data as SerializedProject);
+    return project ? { project, media: [] } : null;
   }
 
   if ("project" in data) {
     const document = data as ProjectDocument;
-    if (!document.project?.metadata) return null;
-    return {
-      project: reviveProject(document.project),
-      media: document.media ?? [],
-    };
+    const project = document.project && reviveProject(document.project);
+    const media = document.media ?? [];
+    if (!project || !Array.isArray(media)) return null;
+    return { project, media };
   }
 
   return null;
@@ -111,22 +108,41 @@ function stripAudioBuffers(track: AudioTrack): AudioTrack {
   };
 }
 
-function reviveProject(project: SerializedProject | TProject): TProject {
+// Saved project data is untrusted: corrupt metadata or scene timestamps must
+// not crash the editor when loading a persisted project.
+function reviveProject(project: SerializedProject | TProject): TProject | null {
+  if (!project?.metadata || !Array.isArray(project.scenes)) return null;
+
+  const createdAt = toDate(project.metadata.createdAt);
+  const updatedAt = toDate(project.metadata.updatedAt);
+  if (!createdAt || !updatedAt) return null;
+
+  const scenes: TScene[] = [];
+  for (const scene of project.scenes) {
+    if (!scene || typeof scene !== "object") return null;
+    const sceneCreatedAt = toDate(scene.createdAt);
+    const sceneUpdatedAt = toDate(scene.updatedAt);
+    if (!sceneCreatedAt || !sceneUpdatedAt) return null;
+    scenes.push({
+      ...scene,
+      createdAt: sceneCreatedAt,
+      updatedAt: sceneUpdatedAt,
+    });
+  }
+
   return {
     ...project,
-    metadata: {
-      ...project.metadata,
-      createdAt: toDate(project.metadata.createdAt),
-      updatedAt: toDate(project.metadata.updatedAt),
-    },
-    scenes: project.scenes.map((scene) => ({
-      ...scene,
-      createdAt: toDate(scene.createdAt),
-      updatedAt: toDate(scene.updatedAt),
-    })),
+    metadata: { ...project.metadata, createdAt, updatedAt },
+    scenes,
   };
 }
 
-function toDate(value: string | Date): Date {
-  return value instanceof Date ? value : new Date(value);
+function toDate(value: string | Date): Date | null {
+  const parsed =
+    value instanceof Date
+      ? new Date(value.getTime())
+      : typeof value === "string"
+        ? new Date(value)
+        : null;
+  return parsed && Number.isFinite(parsed.getTime()) ? parsed : null;
 }

@@ -63,6 +63,36 @@ describe("project document serialization", () => {
     expect(deserializeProjectDocument({ something: "else" })).toBeNull();
   });
 
+  test("rejects malformed persisted project structures without throwing", () => {
+    const document = serializeProjectDocument({ project: buildSampleProject(), media: [] });
+    const corruptions = [
+      { ...document, project: { ...document.project, scenes: null } },
+      { ...document, project: { ...document.project, metadata: { ...document.project.metadata, createdAt: "not-a-date" } } },
+      { ...document, project: { ...document.project, scenes: [null] } },
+      { ...document, project: { ...document.project, scenes: [{ ...document.project.scenes[0], updatedAt: "not-a-date" }] } },
+      { ...document, media: "malformed-media-list" },
+    ];
+    for (const malformed of corruptions) {
+      expect(deserializeProjectDocument(malformed)).toBeNull();
+    }
+  });
+
+  test("revives multiple scenes and preserves source runtime dates", () => {
+    const project = buildSampleProject();
+    const second = buildDefaultScene({ name: "Second scene", isMain: false });
+    second.createdAt = new Date("2026-06-01T00:00:00.000Z");
+    second.updatedAt = new Date("2026-06-02T00:00:00.000Z");
+    project.scenes.push(second);
+    const originalCreatedAt = project.scenes[1].createdAt;
+
+    const serialized = JSON.parse(JSON.stringify(serializeProjectDocument({ project, media: [] })));
+    const restored = deserializeProjectDocument(serialized);
+    expect(restored?.project.scenes).toHaveLength(2);
+    expect(restored?.project.scenes[1].createdAt).toEqual(second.createdAt);
+    expect(restored?.project.scenes[1].updatedAt).toEqual(second.updatedAt);
+    expect(project.scenes[1].createdAt).toBe(originalCreatedAt);
+  });
+
   test("strips decoded AudioBuffers from audio elements", () => {
     const project = buildSampleProject();
     const audioTrack: AudioTrack = {

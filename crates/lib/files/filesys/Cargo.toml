@@ -25,4 +25,3 @@ walkdir.workspace = true
 
 [dev-dependencies]
 test_utils = { path = "../../../testing/test_utils" }
-tempfile.workspace = true

@@ -119,4 +119,4 @@ jobs:
       - name: Install locked frontend dependencies
         run: npm ci --no-audit --no-fund
       - name: Exercise real Vite socket and fake Rust process tree
-        run: node --test scripts/unix-dev.test.mjs
+        run: node --test scripts/unix-dev.test.mjs scripts/macos-signing-workflow.test.mjs
